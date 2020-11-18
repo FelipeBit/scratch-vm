@@ -10,6 +10,9 @@ const log = require('../util/log');
 const Variable = require('./variable');
 const getMonitorIdForBlockWithArgs = require('../util/get-monitor-id');
 
+let blocksArray = [];
+const scripts = [];
+
 /**
  * @fileoverview
  * Store and mutate the VM block representation,
@@ -26,6 +29,10 @@ class Blocks {
     constructor (runtime, optNoGlow) {
         this.runtime = runtime;
 
+        localStorage.removeItem('lastBlockInserted');
+        localStorage.removeItem('lastBlockMessage');
+        localStorage.removeItem('blocks');
+        localStorage.removeItem('scripts');
         /**
          * All blocks in the workspace.
          * Keys are block IDs, values are metadata about the block.
@@ -315,6 +322,7 @@ class Blocks {
         }
 
         // Block create/update/destroy
+
         switch (e.type) {
         case 'create': {
             const newBlocks = adapter(e);
@@ -348,15 +356,46 @@ class Blocks {
         case 'endDrag':
             this.runtime.emitBlockDragUpdate(false /* areBlocksOverGui */);
 
-            // Drag blocks onto another sprite
             if (e.isOutside) {
                 const newBlocks = adapter(e);
                 this.runtime.emitBlockEndDrag(newBlocks, e.blockId);
+                // console.log('fora da área permitida!');
+            } else {
+                // SE O BLOCO ESTA SENDO MOVIMENTADO PELA PRIMEIRA VEZ  timesMoved = 1, SENÃO INCREMENTO EM 1
+                const blockAlreadyMoved = blocksArray.find(block => block.id === e.blockId);
+
+                if (blockAlreadyMoved) {
+                    blocksArray.forEach(block => {
+                        if (block.id === e.blockId) {
+                            block.timesMoved = block.timesMoved + 1;
+                        }
+                    });
+                } else {
+                    blocksArray.push({
+                        id: e.blockId,
+                        timesMoved: 1,
+                        block: this.getBlock(e.blockId)
+                    });
+                }
+
+
+                // Drag blocks onto another sprite
+
+                // ATUALIZO INFORMAÇÕES, COMO BLOCOS, SCRIPTS E ULTIMO BLOCO INSERIDO/MOVIMENTADO
+                localStorage.setItem('blocks', JSON.stringify(blocksArray));
+                localStorage.setItem('scripts', this.getScripts());
+                localStorage.setItem('lastBlockInserted', JSON.stringify(this.getBlock(e.blockId)));
             }
             break;
         case 'delete':
             // Don't accept delete events for missing blocks,
             // or shadow blocks being obscured.
+
+            // EXCLUI BLOCOS QUE FORAM EXCLUIDOS PELO USUÁRIO
+            e.ids.forEach(blockId => {
+                blocksArray = blocksArray.filter(block => block.id !== blockId);
+            });
+
             if (!this._blocks.hasOwnProperty(e.blockId) ||
                 this._blocks[e.blockId].shadow) {
                 return;
