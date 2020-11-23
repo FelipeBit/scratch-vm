@@ -11,6 +11,7 @@ const Variable = require('./variable');
 const getMonitorIdForBlockWithArgs = require('../util/get-monitor-id');
 
 let blocksArray = [];
+const blocksHistoryArray = [];
 const scripts = [];
 
 /**
@@ -32,7 +33,9 @@ class Blocks {
         localStorage.removeItem('lastBlockInserted');
         localStorage.removeItem('lastBlockMessage');
         localStorage.removeItem('blocks');
+        localStorage.removeItem('blocksHistory');
         localStorage.removeItem('scripts');
+        localStorage.removeItem('outside');
         /**
          * All blocks in the workspace.
          * Keys are block IDs, values are metadata about the block.
@@ -359,9 +362,11 @@ class Blocks {
             if (e.isOutside) {
                 const newBlocks = adapter(e);
                 this.runtime.emitBlockEndDrag(newBlocks, e.blockId);
+                localStorage.setItem('outside', 'true');
                 // console.log('fora da área permitida!');
             } else {
                 // SE O BLOCO ESTA SENDO MOVIMENTADO PELA PRIMEIRA VEZ  timesMoved = 1, SENÃO INCREMENTO EM 1
+                // FAZER O MESMO PARA BLOCOS IGUAIS
                 const blockAlreadyMoved = blocksArray.find(block => block.id === e.blockId);
 
                 if (blockAlreadyMoved) {
@@ -371,17 +376,26 @@ class Blocks {
                         }
                     });
                 } else {
+                    const insertedBlock = this.getBlock(e.blockId);
+                    const blockAlreadyInserted = blocksHistoryArray.find(block => block.block.opcode === insertedBlock.opcode);
+
                     blocksArray.push({
                         id: e.blockId,
-                        timesMoved: 1,
+                        timesMoved: blockAlreadyInserted ? 2 : 1,
+                        block: this.getBlock(e.blockId)
+                    });
+
+                    blocksHistoryArray.push({
+                        id: e.blockId,
+                        timesMoved: blockAlreadyInserted ? 2 : 1,
                         block: this.getBlock(e.blockId)
                     });
                 }
 
-
                 // Drag blocks onto another sprite
 
                 // ATUALIZO INFORMAÇÕES, COMO BLOCOS, SCRIPTS E ULTIMO BLOCO INSERIDO/MOVIMENTADO
+                localStorage.setItem('blocksHistory', JSON.stringify(blocksArray));
                 localStorage.setItem('blocks', JSON.stringify(blocksArray));
                 localStorage.setItem('scripts', this.getScripts());
                 localStorage.setItem('lastBlockInserted', JSON.stringify(this.getBlock(e.blockId)));
